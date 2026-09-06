@@ -1,31 +1,93 @@
-import { getCountryById, countries } from "@/lib/data/countries";
-import { formatIndicatorValue } from "@/lib/data/indicators";
+import { getCountries, getCountryWithLatestMetrics } from "@/lib/data/countries";
+import { formatMetricValue, getMetrics } from "@/lib/data/metrics";
+import { getHistoricalDataForCountry } from "@/lib/data/values";
 import { notFound } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
+function MiniChart({ data, metric }) {
+  if (!data || data.length === 0) return null;
+  const startYear = Math.min(...data.map(d => d.year));
+  const endYear = Math.max(...data.map(d => d.year));
+  
+  const fullData = [];
+  for (let y = startYear; y <= endYear; y++) {
+    const point = data.find(d => d.year === y);
+    fullData.push(point || { year: y, value: null });
+  }
+
+  const values = data.map(d => d.value);
+  const max = Math.max(0, ...values);
+  const min = Math.min(0, ...values);
+  const range = Math.max(max - min, 1);
+  const zeroLinePct = (Math.abs(min) / range) * 100;
+
+  return (
+    <div className="flex items-stretch gap-1 h-16 mt-4 relative border-b">
+      {min < 0 && (
+        <div 
+          className="absolute left-0 right-0 border-t border-dashed border-muted-foreground/30 pointer-events-none"
+          style={{ bottom: `${zeroLinePct}%` }}
+        />
+      )}
+      
+      {fullData.map(point => {
+        if (point.value === null) {
+          return <div key={point.year} className="flex-1 opacity-0" />;
+        }
+        
+        const isNegative = point.value < 0;
+        const heightPct = (Math.abs(point.value) / range) * 100;
+        const minHeight = Math.max(heightPct, 2);
+
+        return (
+          <div key={point.year} className="flex-1 relative group">
+            <div 
+              className={`absolute w-full rounded-sm transition-colors ${isNegative ? 'bg-destructive/50 group-hover:bg-destructive' : 'bg-primary/50 group-hover:bg-primary'}`} 
+              style={{ 
+                height: `${minHeight}%`,
+                ...(isNegative 
+                  ? { top: `${100 - zeroLinePct}%` } 
+                  : { bottom: `${zeroLinePct}%` }
+                )
+              }}
+            />
+            <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-popover text-popover-foreground text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-10 shadow-sm border">
+              {point.year}: {formatMetricValue(point.value, metric)}
+            </div>
+            <div className="absolute inset-0 z-0 cursor-crosshair" />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export async function generateStaticParams() {
-  return countries.map((c) => ({
+  const allCountries = await getCountries();
+  return allCountries.map((c) => ({
     id: c.id,
   }));
 }
 
 export default async function CountryPage({ params }) {
   const p = await params;
-  const country = getCountryById(p.id);
+  const country = await getCountryWithLatestMetrics(p.id);
 
   if (!country) {
     notFound();
   }
 
-  const stats = [
-    { label: "Population", value: formatIndicatorValue(country.population, "population") },
-    { label: "GDP (USD)", value: formatIndicatorValue(country.gdp, "gdp") },
-    { label: "GDP Growth", value: formatIndicatorValue(country.gdpGrowth, "gdpGrowth") },
-    { label: "Inflation", value: formatIndicatorValue(country.inflation, "inflation") },
-    { label: "CO2 Emissions", value: formatIndicatorValue(country.co2, "co2") },
-  ];
+  const allMetrics = await getMetrics();
+  const historicalData = await getHistoricalDataForCountry(p.id);
+
+  const stats = allMetrics.map((metric) => ({
+    metric: metric,
+    label: metric.name,
+    value: formatMetricValue(country[metric.id], metric),
+    history: historicalData[metric.id] || []
+  }));
 
   return (
     <div className="container px-4 py-8 md:py-12 mx-auto">
@@ -55,14 +117,15 @@ export default async function CountryPage({ params }) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {stats.map((stat, i) => (
-          <Card key={i}>
+          <Card key={i} className="flex flex-col">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                {stat.label}
+              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex justify-between">
+                <span>{stat.label}</span>
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 flex flex-col justify-between">
               <div className="text-3xl font-bold">{stat.value}</div>
+              <MiniChart data={stat.history} metric={stat.metric} />
             </CardContent>
           </Card>
         ))}
