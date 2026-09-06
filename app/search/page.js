@@ -85,7 +85,7 @@ export default async function SearchPage({ searchParams }) {
               <h2 className="text-xl font-semibold mb-6 border-b pb-2">Indicators</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {indicatorResults.map((i) => (
-                  <Link href={`/rankings?indicator=${i.id}`} key={i.id}>
+                  <Link href={`/metric/${i.id}`} key={i.id}>
                     <Card className="h-full hover:bg-muted/50 transition-colors">
                       <CardHeader>
                         <div className="flex justify-between items-start">
