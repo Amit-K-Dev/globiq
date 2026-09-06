@@ -30,7 +30,6 @@
 *.db-wal
 
 # Raw Data
-/data/
 
 # Project Management
 globiq-phase-plan.md
@@ -44,6 +43,7 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+.env.local
 
 # vercel
 .vercel
