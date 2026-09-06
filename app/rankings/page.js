@@ -23,7 +23,7 @@ export default async function RankingsPage({ searchParams }) {
 
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
         <div>
-          <Suspense fallback={<div className="h-10 w-[280px] animate-pulse bg-muted rounded"></div>}>
+          <Suspense fallback={<div className="h-10 w-70 animate-pulse bg-muted rounded"></div>}>
             <IndicatorSelector currentIndicator={indicatorId} metrics={metrics} />
           </Suspense>
         </div>

@@ -24,13 +24,13 @@ export default async function Home() {
     <div className="flex flex-col min-h-screen">
       {/* Hero Section */}
       <section className="relative w-full py-24 md:py-32 lg:py-48 overflow-hidden bg-background">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/10 via-background to-background" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,var(--tw-gradient-stops))] from-primary/10 via-background to-background" />
         <div className="container relative z-10 px-4 md:px-6 mx-auto flex flex-col items-center text-center">
           <Badge className="mb-4" variant="secondary">Beta Release</Badge>
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tighter mb-6">
             The world. <span className="text-primary">In numbers.</span>
           </h1>
-          <p className="max-w-[700px] text-lg md:text-xl text-muted-foreground mb-8">
+          <p className="max-w-175 text-lg md:text-xl text-muted-foreground mb-8">
             Explore, compare, and understand countries, economies, people, environment, trade, and global culture through data.
           </p>
           <form action="/search" className="w-full max-w-2xl relative flex items-center">
@@ -140,7 +140,7 @@ export default async function Home() {
                 <Table>
                   <TableHeader className="bg-muted/50">
                     <TableRow>
-                      <TableHead className="w-[80px]">Rank</TableHead>
+                      <TableHead className="w-20">Rank</TableHead>
                       <TableHead>Country</TableHead>
                       <TableHead className="text-right">GDP (USD)</TableHead>
                       <TableHead className="text-right">Growth</TableHead>

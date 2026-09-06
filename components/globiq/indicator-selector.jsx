@@ -21,7 +21,7 @@ export default function IndicatorSelector({ currentIndicator, metrics = [] }) {
 
   return (
     <Select value={currentIndicator} onValueChange={onSelect}>
-      <SelectTrigger className="w-full md:w-[280px]">
+      <SelectTrigger className="w-full md:w-70">
         <SelectValue placeholder="Select an indicator" />
       </SelectTrigger>
       <SelectContent>
