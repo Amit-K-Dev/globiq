@@ -4,9 +4,9 @@ import TrendingCard from "@/components/globiq/trending-card";
 import CountryCard from "@/components/globiq/country-card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { countries } from "@/lib/data/countries";
-import { topics } from "@/lib/data/topics";
-import { getRankingsByIndicator } from "@/lib/data/indicators";
+import { getCountriesWithLatestMetrics } from "@/lib/data/countries";
+import { getCategories } from "@/lib/data/categories";
+import { getRankingsByMetric } from "@/lib/data/metrics";
 import Link from "next/link";
 
 const getIcon = (name) => {
@@ -14,9 +14,11 @@ const getIcon = (name) => {
   return icons[name] || Globe;
 };
 
-export default function Home() {
+export default async function Home() {
+  const countries = await getCountriesWithLatestMetrics();
+  const topics = await getCategories();
   const featuredCountries = countries.slice(0, 6);
-  const gdpRankings = getRankingsByIndicator("gdp").slice(0, 5);
+  const gdpRankings = (await getRankingsByMetric("gdp")).slice(0, 5);
 
   return (
     <div className="flex flex-col min-h-screen">

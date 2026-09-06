@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { getRankingsByIndicator, getIndicatorById } from "@/lib/data/indicators";
+import { getRankingsByMetric, getMetricById } from "@/lib/data/metrics";
 import IndicatorSelector from "@/components/globiq/indicator-selector";
 import Link from "next/link";
 
@@ -8,8 +8,9 @@ export default async function RankingsPage({ searchParams }) {
   // Default to population if no indicator specified
   const indicatorId = params.indicator || "population";
   
-  const indicator = getIndicatorById(indicatorId);
-  const rankings = getRankingsByIndicator(indicatorId);
+  const indicator = await getMetricById(indicatorId);
+  const rankings = await getRankingsByMetric(indicatorId);
+  const metrics = await import("@/lib/data/metrics").then(m => m.getMetrics());
 
   return (
     <div className="container px-4 py-8 md:py-12 mx-auto">
@@ -23,7 +24,7 @@ export default async function RankingsPage({ searchParams }) {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
         <div>
           <Suspense fallback={<div className="h-10 w-[280px] animate-pulse bg-muted rounded"></div>}>
-            <IndicatorSelector currentIndicator={indicatorId} />
+            <IndicatorSelector currentIndicator={indicatorId} metrics={metrics} />
           </Suspense>
         </div>
       </div>

@@ -1,5 +1,5 @@
-import { countries } from "@/lib/data/countries";
-import { topics } from "@/lib/data/topics";
+import { getCountriesWithLatestMetrics } from "@/lib/data/countries";
+import { getCategories } from "@/lib/data/categories";
 import CountryCard from "@/components/globiq/country-card";
 import CategoryCard from "@/components/globiq/category-card";
 import { Landmark, Users, Leaf, Zap, Globe, TrendingUp } from "lucide-react";
@@ -9,7 +9,9 @@ const getIcon = (name) => {
   return icons[name] || Globe;
 };
 
-export default function ExplorePage() {
+export default async function ExplorePage() {
+  const countries = await getCountriesWithLatestMetrics();
+  const topics = await getCategories();
   return (
     <div className="container px-4 py-8 md:py-12 mx-auto">
       <div className="mb-12">

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { countries } from "@/lib/data/countries";
 import { Check, ChevronsUpDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -20,7 +19,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-export default function CompareSelector({ selectedIds = [] }) {
+export default function CompareSelector({ selectedIds = [], countries = [] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);

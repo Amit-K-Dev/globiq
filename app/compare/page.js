@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import CompareSelector from "@/components/globiq/compare-selector";
-import { getCountriesByIds } from "@/lib/data/countries";
-import { formatIndicatorValue } from "@/lib/data/indicators";
+import { getCountries, getCountryWithLatestMetrics } from "@/lib/data/countries";
+import { formatMetricValue, getMetrics } from "@/lib/data/metrics";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
@@ -11,15 +11,12 @@ export default async function ComparePage({ searchParams }) {
   
   // Enforce max 4
   const limitedIds = countryIds.slice(0, 4);
-  const selectedCountries = getCountriesByIds(limitedIds);
+  const selectedCountries = await Promise.all(
+    limitedIds.map(id => getCountryWithLatestMetrics(id))
+  ).then(res => res.filter(Boolean));
 
-  const metrics = [
-    { id: "population", name: "Population" },
-    { id: "gdp", name: "GDP (USD)" },
-    { id: "gdpGrowth", name: "GDP Growth (%)" },
-    { id: "inflation", name: "Inflation (%)" },
-    { id: "co2", name: "CO2 Emissions (kt)" },
-  ];
+  const allCountries = await getCountries();
+  const metrics = await getMetrics();
 
   return (
     <div className="container px-4 py-8 md:py-12 mx-auto">
@@ -32,7 +29,7 @@ export default async function ComparePage({ searchParams }) {
 
       <div className="mb-12">
         <Suspense fallback={<div className="h-10 w-full animate-pulse bg-muted rounded"></div>}>
-          <CompareSelector selectedIds={limitedIds} />
+          <CompareSelector selectedIds={limitedIds} countries={allCountries} />
         </Suspense>
       </div>
 
@@ -65,7 +62,7 @@ export default async function ComparePage({ searchParams }) {
                   <td className="p-4 font-medium">{metric.name}</td>
                   {selectedCountries.map((country) => (
                     <td key={`${country.id}-${metric.id}`} className="p-4">
-                      {formatIndicatorValue(country[metric.id], metric.id)}
+                      {formatMetricValue(country[metric.id], metric)}
                     </td>
                   ))}
                   {Array.from({ length: Math.max(0, 4 - selectedCountries.length) }).map((_, i) => (

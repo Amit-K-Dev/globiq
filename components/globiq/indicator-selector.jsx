@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { indicators } from "@/lib/data/indicators";
 import {
   Select,
   SelectContent,
@@ -10,7 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export default function IndicatorSelector({ currentIndicator }) {
+export default function IndicatorSelector({ currentIndicator, metrics = [] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -26,7 +25,7 @@ export default function IndicatorSelector({ currentIndicator }) {
         <SelectValue placeholder="Select an indicator" />
       </SelectTrigger>
       <SelectContent>
-        {indicators.map((indicator) => (
+        {metrics.map((indicator) => (
           <SelectItem key={indicator.id} value={indicator.id}>
             {indicator.name}
           </SelectItem>

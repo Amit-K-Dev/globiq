@@ -1,6 +1,6 @@
 import { searchCountries } from "@/lib/data/countries";
-import { searchTopics } from "@/lib/data/topics";
-import { searchIndicators } from "@/lib/data/indicators";
+import { searchCategories } from "@/lib/data/categories";
+import { searchMetrics } from "@/lib/data/metrics";
 import CountryCard from "@/components/globiq/country-card";
 import CategoryCard from "@/components/globiq/category-card";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -17,9 +17,9 @@ export default async function SearchPage({ searchParams }) {
   const params = await searchParams;
   const query = params.q || "";
 
-  const countryResults = searchCountries(query);
-  const topicResults = searchTopics(query);
-  const indicatorResults = searchIndicators(query);
+  const countryResults = await searchCountries(query);
+  const topicResults = await searchCategories(query);
+  const indicatorResults = await searchMetrics(query);
 
   const hasResults = countryResults.length > 0 || topicResults.length > 0 || indicatorResults.length > 0;
 

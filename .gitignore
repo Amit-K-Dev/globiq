@@ -24,6 +24,17 @@
 .DS_Store
 *.pem
 
+# SQLite Database
+*.db
+*.db-shm
+*.db-wal
+
+# Raw Data
+/data/
+
+# Project Management
+globiq-phase-plan.md
+
 # debug
 npm-debug.log*
 yarn-debug.log*
