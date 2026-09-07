@@ -34,5 +34,11 @@
   },
   "allowScripts": {
     "better-sqlite3": true
+  },
+  "overrides": {
+    "react-simple-maps": {
+      "react": "$react",
+      "react-dom": "$react-dom"
+    }
   }
 }
