@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Search } from "lucide-react";
 
 export default function Navbar() {
@@ -7,9 +8,7 @@ export default function Navbar() {
       <div className="container flex h-16 items-center mx-auto px-4 sm:px-8">
         <div className="mr-4 flex">
           <Link href="/" className="mr-6 flex items-center space-x-2">
-            <span className="font-bold sm:inline-block text-xl tracking-tight">
-              Globiq
-            </span>
+            <Image src="/globiq-logo.png" alt="Globiq Logo" width={120} height={32} className="h-7 w-auto" priority />
           </Link>
           <nav className="flex items-center space-x-6 text-sm font-medium">
             <Link

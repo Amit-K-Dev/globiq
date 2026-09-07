@@ -1,7 +1,8 @@
 import { Suspense } from "react";
 import CompareSelector from "@/components/globiq/compare-selector";
 import { getCountries, getCountryWithLatestMetrics } from "@/lib/data/countries";
-import { formatMetricValue, getMetrics } from "@/lib/data/metrics";
+import { getMetrics } from "@/lib/data/metrics";
+import { formatMetricValue } from "@/lib/utils/format";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 

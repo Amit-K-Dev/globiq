@@ -1,16 +1,40 @@
 import { Suspense } from "react";
 import { getRankingsByMetric, getMetricById } from "@/lib/data/metrics";
 import IndicatorSelector from "@/components/globiq/indicator-selector";
+import { RegionFilter, ShowMoreButton } from "@/components/globiq/rankings-filters";
+import CSVExportButton from "@/components/globiq/csv-export-button";
 import Link from "next/link";
 
 export default async function RankingsPage({ searchParams }) {
   const params = await searchParams;
   // Default to population if no indicator specified
   const indicatorId = params.indicator || "population";
+  const region = params.region || "all";
+  const limit = params.limit ? parseInt(params.limit) : 50;
   
   const indicator = await getMetricById(indicatorId);
-  const rankings = await getRankingsByMetric(indicatorId);
+  const rankings = await getRankingsByMetric(indicatorId, region, limit);
+  // To check if there's more, we fetch limit + 1
+  const rankingsCheck = await getRankingsByMetric(indicatorId, region, limit + 1);
+  const hasMore = rankingsCheck.length > limit;
+
   const metrics = await import("@/lib/data/metrics").then(m => m.getMetrics());
+
+  const csvData = rankings.map((item, index) => ({
+    rank: index + 1,
+    country: item.country.name,
+    region: item.country.region,
+    value: item.country[indicatorId === 'gdp-growth' ? 'gdpGrowth' : indicatorId],
+    formattedValue: item.formattedValue,
+  }));
+
+  const csvColumns = [
+    { label: "Rank", key: "rank" },
+    { label: "Country", key: "country" },
+    { label: "Region", key: "region" },
+    { label: indicator?.name || "Value", key: "value" },
+    { label: "Formatted Value", key: "formattedValue" },
+  ];
 
   return (
     <div className="container px-4 py-8 md:py-12 mx-auto">
@@ -22,11 +46,21 @@ export default async function RankingsPage({ searchParams }) {
       </div>
 
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
-        <div>
+        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
           <Suspense fallback={<div className="h-10 w-70 animate-pulse bg-muted rounded"></div>}>
             <IndicatorSelector currentIndicator={indicatorId} metrics={metrics} />
           </Suspense>
+          <Suspense fallback={<div className="h-10 w-40 animate-pulse bg-muted rounded"></div>}>
+            <RegionFilter />
+          </Suspense>
         </div>
+        {indicator && (
+          <CSVExportButton 
+            data={csvData} 
+            filename={`${indicator.name.toLowerCase().replace(/\s+/g, '-')}-rankings`} 
+            columns={csvColumns} 
+          />
+        )}
       </div>
 
       {indicator ? (
@@ -72,6 +106,14 @@ export default async function RankingsPage({ searchParams }) {
               </tbody>
             </table>
           </div>
+          
+          <Suspense fallback={null}>
+            <ShowMoreButton 
+              currentLimit={limit} 
+              totalAvailable={hasMore ? limit + 1 : limit} 
+            />
+          </Suspense>
+          
         </div>
       ) : (
         <div className="p-8 text-center border rounded-md bg-muted/20">

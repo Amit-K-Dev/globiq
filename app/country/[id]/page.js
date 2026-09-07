@@ -1,68 +1,14 @@
 import { getCountries, getCountryWithLatestMetrics } from "@/lib/data/countries";
-import { formatMetricValue, getMetrics } from "@/lib/data/metrics";
+import { getMetrics } from "@/lib/data/metrics";
+import { formatMetricValue } from "@/lib/utils/format";
 import { getHistoricalDataForCountry } from "@/lib/data/values";
 import { notFound } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import CSVExportButton from "@/components/globiq/csv-export-button";
 
-function MiniChart({ data, metric }) {
-  if (!data || data.length === 0) return null;
-  const startYear = Math.min(...data.map(d => d.year));
-  const endYear = Math.max(...data.map(d => d.year));
-  
-  const fullData = [];
-  for (let y = startYear; y <= endYear; y++) {
-    const point = data.find(d => d.year === y);
-    fullData.push(point || { year: y, value: null });
-  }
-
-  const values = data.map(d => d.value);
-  const max = Math.max(0, ...values);
-  const min = Math.min(0, ...values);
-  const range = Math.max(max - min, 1);
-  const zeroLinePct = (Math.abs(min) / range) * 100;
-
-  return (
-    <div className="flex items-stretch gap-1 h-16 mt-4 relative border-b">
-      {min < 0 && (
-        <div 
-          className="absolute left-0 right-0 border-t border-dashed border-muted-foreground/30 pointer-events-none"
-          style={{ bottom: `${zeroLinePct}%` }}
-        />
-      )}
-      
-      {fullData.map(point => {
-        if (point.value === null) {
-          return <div key={point.year} className="flex-1 opacity-0" />;
-        }
-        
-        const isNegative = point.value < 0;
-        const heightPct = (Math.abs(point.value) / range) * 100;
-        const minHeight = Math.max(heightPct, 2);
-
-        return (
-          <div key={point.year} className="flex-1 relative group">
-            <div 
-              className={`absolute w-full rounded-sm transition-colors ${isNegative ? 'bg-destructive/50 group-hover:bg-destructive' : 'bg-primary/50 group-hover:bg-primary'}`} 
-              style={{ 
-                height: `${minHeight}%`,
-                ...(isNegative 
-                  ? { top: `${100 - zeroLinePct}%` } 
-                  : { bottom: `${zeroLinePct}%` }
-                )
-              }}
-            />
-            <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-popover text-popover-foreground text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-10 shadow-sm border">
-              {point.year}: {formatMetricValue(point.value, metric)}
-            </div>
-            <div className="absolute inset-0 z-0 cursor-crosshair" />
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+import CountryHistoryChart from "@/components/globiq/country-history-chart";
 
 export async function generateStaticParams() {
   const allCountries = await getCountries();
@@ -89,6 +35,18 @@ export default async function CountryPage({ params }) {
     history: historicalData[metric.id] || []
   }));
 
+  const csvData = stats.map(stat => ({
+    metric: stat.label,
+    value: stat.value,
+    unit: stat.metric.unit || stat.metric.format_type,
+  }));
+
+  const csvColumns = [
+    { label: "Metric", key: "metric" },
+    { label: "Value", key: "value" },
+    { label: "Unit", key: "unit" },
+  ];
+
   return (
     <div className="container px-4 py-8 md:py-12 mx-auto">
       <div className="mb-6">
@@ -108,14 +66,19 @@ export default async function CountryPage({ params }) {
             <p className="text-xl text-muted-foreground">{country.region}</p>
           </div>
         </div>
-        <div>
-          <Link href={`/compare?countries=${country.id}`} className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-8 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <CSVExportButton 
+            data={csvData} 
+            filename={`${country.name.toLowerCase().replace(/\s+/g, '-')}-data`} 
+            columns={csvColumns} 
+          />
+          <Link href={`/compare?countries=${country.id}`} className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-8 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90">
             Compare
           </Link>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
         {stats.map((stat, i) => (
           <Card key={i} className="flex flex-col">
             <CardHeader className="pb-2">
@@ -125,11 +88,12 @@ export default async function CountryPage({ params }) {
             </CardHeader>
             <CardContent className="flex-1 flex flex-col justify-between">
               <div className="text-3xl font-bold">{stat.value}</div>
-              <MiniChart data={stat.history} metric={stat.metric} />
             </CardContent>
           </Card>
         ))}
       </div>
+
+      <CountryHistoryChart stats={stats} />
     </div>
   );
 }

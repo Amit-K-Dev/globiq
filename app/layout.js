@@ -12,6 +12,7 @@ const inter = Inter({
 export const metadata = {
   title: "Globiq — Explore the World Through Data",
   description: "Globiq is a free global data intelligence platform for exploring, comparing, and understanding the world through data.",
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({ children }) {
