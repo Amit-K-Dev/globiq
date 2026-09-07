@@ -3,7 +3,8 @@ CREATE TABLE IF NOT EXISTS countries (
     name TEXT NOT NULL,
     iso_code TEXT,
     flag TEXT,
-    region TEXT
+    region TEXT,
+    income_group TEXT
 );
 
 CREATE TABLE IF NOT EXISTS categories (

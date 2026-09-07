@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { getRankingsByMetric, getMetricById } from "@/lib/data/metrics";
 import IndicatorSelector from "@/components/globiq/indicator-selector";
-import { RegionFilter, ShowMoreButton } from "@/components/globiq/rankings-filters";
+import { RegionFilter, IncomeGroupFilter, YearFilter, ShowMoreButton } from "@/components/globiq/rankings-filters";
 import CSVExportButton from "@/components/globiq/csv-export-button";
 import Link from "next/link";
 
@@ -10,12 +10,14 @@ export default async function RankingsPage({ searchParams }) {
   // Default to population if no indicator specified
   const indicatorId = params.indicator || "population";
   const region = params.region || "all";
+  const incomeGroup = params.incomeGroup || "all";
+  const year = params.year ? parseInt(params.year) : 2023;
   const limit = params.limit ? parseInt(params.limit) : 50;
   
   const indicator = await getMetricById(indicatorId);
-  const rankings = await getRankingsByMetric(indicatorId, region, limit);
+  const rankings = await getRankingsByMetric(indicatorId, region, incomeGroup, year, limit);
   // To check if there's more, we fetch limit + 1
-  const rankingsCheck = await getRankingsByMetric(indicatorId, region, limit + 1);
+  const rankingsCheck = await getRankingsByMetric(indicatorId, region, incomeGroup, year, limit + 1);
   const hasMore = rankingsCheck.length > limit;
 
   const metrics = await import("@/lib/data/metrics").then(m => m.getMetrics());
@@ -24,6 +26,7 @@ export default async function RankingsPage({ searchParams }) {
     rank: index + 1,
     country: item.country.name,
     region: item.country.region,
+    incomeGroup: item.country.income_group || 'Unknown',
     value: item.country[indicatorId === 'gdp-growth' ? 'gdpGrowth' : indicatorId],
     formattedValue: item.formattedValue,
   }));
@@ -32,6 +35,7 @@ export default async function RankingsPage({ searchParams }) {
     { label: "Rank", key: "rank" },
     { label: "Country", key: "country" },
     { label: "Region", key: "region" },
+    { label: "Income Group", key: "incomeGroup" },
     { label: indicator?.name || "Value", key: "value" },
     { label: "Formatted Value", key: "formattedValue" },
   ];
@@ -46,18 +50,24 @@ export default async function RankingsPage({ searchParams }) {
       </div>
 
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
-        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+        <div className="flex flex-col md:flex-row flex-wrap gap-4 items-start md:items-center">
           <Suspense fallback={<div className="h-10 w-70 animate-pulse bg-muted rounded"></div>}>
             <IndicatorSelector currentIndicator={indicatorId} metrics={metrics} />
           </Suspense>
           <Suspense fallback={<div className="h-10 w-40 animate-pulse bg-muted rounded"></div>}>
             <RegionFilter />
           </Suspense>
+          <Suspense fallback={<div className="h-10 w-40 animate-pulse bg-muted rounded"></div>}>
+            <IncomeGroupFilter />
+          </Suspense>
+          <Suspense fallback={<div className="h-10 w-32 animate-pulse bg-muted rounded"></div>}>
+            <YearFilter />
+          </Suspense>
         </div>
         {indicator && (
           <CSVExportButton 
             data={csvData} 
-            filename={`${indicator.name.toLowerCase().replace(/\s+/g, '-')}-rankings`} 
+            filename={`${indicator.name.toLowerCase().replace(/\s+/g, '-')}-rankings-${year}`} 
             columns={csvColumns} 
           />
         )}

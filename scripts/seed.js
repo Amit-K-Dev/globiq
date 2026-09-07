@@ -22,7 +22,16 @@ db.exec(schema);
 
 console.log('Inserting base entities...');
 
-const insertCountry = db.prepare(`INSERT OR REPLACE INTO countries (id, name, iso_code, flag, region) VALUES (?, ?, ?, ?, ?)`);
+const incomeGroups = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'raw', 'income-groups.json'), 'utf8'));
+  } catch (e) {
+    console.warn('Could not load income-groups.json. Income groups will be Unknown.');
+    return {};
+  }
+})();
+
+const insertCountry = db.prepare(`INSERT OR REPLACE INTO countries (id, name, iso_code, flag, region, income_group) VALUES (?, ?, ?, ?, ?, ?)`);
 const countries = [
   ['usa', 'United States', 'USA', '🇺🇸', 'North America'],
   ['chn', 'China', 'CHN', '🇨🇳', 'East Asia'],
@@ -33,7 +42,11 @@ const countries = [
   ['gbr', 'United Kingdom', 'GBR', '🇬🇧', 'Europe'],
   ['fra', 'France', 'FRA', '🇫🇷', 'Europe'],
 ];
-countries.forEach(c => insertCountry.run(...c));
+countries.forEach(c => {
+  const iso = c[2];
+  const incomeGroup = incomeGroups[iso] || 'Unknown';
+  insertCountry.run(...c, incomeGroup);
+});
 
 const insertCategory = db.prepare(`INSERT OR REPLACE INTO categories (id, name, icon) VALUES (?, ?, ?)`);
 insertCategory.run('economy', 'Economy', '💰');

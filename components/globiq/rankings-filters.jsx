@@ -35,13 +35,92 @@ export function RegionFilter() {
     <div className="flex items-center gap-2">
       <span className="text-sm text-muted-foreground whitespace-nowrap">Region:</span>
       <Select value={currentRegion} onValueChange={onRegionChange}>
-        <SelectTrigger className="w-44">
+        <SelectTrigger className="w-36 md:w-44">
           <SelectValue placeholder="All Regions" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Regions</SelectItem>
           {REGIONS.filter(r => r !== "all").map(r => (
             <SelectItem key={r} value={r}>{r}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+const INCOME_GROUPS = [
+  "High income",
+  "Upper middle income",
+  "Lower middle income",
+  "Low income",
+  "Not classified"
+];
+
+export function IncomeGroupFilter() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const currentGroup = searchParams.get("incomeGroup") || "all";
+
+  const onGroupChange = (value) => {
+    const params = new URLSearchParams(searchParams);
+    if (value === "all") {
+      params.delete("incomeGroup");
+    } else {
+      params.set("incomeGroup", value);
+    }
+    params.delete("limit");
+    router.push(`${pathname}?${params.toString()}`);
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-sm text-muted-foreground whitespace-nowrap">Income:</span>
+      <Select value={currentGroup} onValueChange={onGroupChange}>
+        <SelectTrigger className="w-36 md:w-44">
+          <SelectValue placeholder="All Incomes" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Incomes</SelectItem>
+          {INCOME_GROUPS.map(g => (
+            <SelectItem key={g} value={g}>{g}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+const YEARS = ["2023", "2022", "2021"];
+
+export function YearFilter() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const currentYear = searchParams.get("year") || "2023";
+
+  const onYearChange = (value) => {
+    const params = new URLSearchParams(searchParams);
+    if (value === "2023") {
+      params.delete("year");
+    } else {
+      params.set("year", value);
+    }
+    params.delete("limit");
+    router.push(`${pathname}?${params.toString()}`);
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-sm text-muted-foreground whitespace-nowrap">Year:</span>
+      <Select value={currentYear} onValueChange={onYearChange}>
+        <SelectTrigger className="w-24 md:w-32">
+          <SelectValue placeholder="Year" />
+        </SelectTrigger>
+        <SelectContent>
+          {YEARS.map(y => (
+            <SelectItem key={y} value={y}>{y}</SelectItem>
           ))}
         </SelectContent>
       </Select>
