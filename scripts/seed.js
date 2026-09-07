@@ -6,8 +6,12 @@ const csv = require('csv-parser');
 const dbPath = path.join(__dirname, '..', 'globiq.db');
 const schemaPath = path.join(__dirname, '..', 'lib', 'db', 'schema.sql');
 
-if (fs.existsSync(dbPath)) {
-  fs.unlinkSync(dbPath);
+try {
+  if (fs.existsSync(dbPath)) {
+    fs.unlinkSync(dbPath);
+  }
+} catch (e) {
+  console.warn('Could not delete db file, it might be locked. Proceeding anyway.');
 }
 
 const db = new Database(dbPath);
@@ -18,7 +22,7 @@ db.exec(schema);
 
 console.log('Inserting base entities...');
 
-const insertCountry = db.prepare(`INSERT INTO countries (id, name, iso_code, flag, region) VALUES (?, ?, ?, ?, ?)`);
+const insertCountry = db.prepare(`INSERT OR REPLACE INTO countries (id, name, iso_code, flag, region) VALUES (?, ?, ?, ?, ?)`);
 const countries = [
   ['usa', 'United States', 'USA', '🇺🇸', 'North America'],
   ['chn', 'China', 'CHN', '🇨🇳', 'East Asia'],
@@ -31,22 +35,27 @@ const countries = [
 ];
 countries.forEach(c => insertCountry.run(...c));
 
-const insertCategory = db.prepare(`INSERT INTO categories (id, name, icon) VALUES (?, ?, ?)`);
+const insertCategory = db.prepare(`INSERT OR REPLACE INTO categories (id, name, icon) VALUES (?, ?, ?)`);
 insertCategory.run('economy', 'Economy', '💰');
 insertCategory.run('population', 'Population', '👥');
 insertCategory.run('environment', 'Environment', '🌱');
 
-const insertMetric = db.prepare(`INSERT INTO metrics (id, name, category_id, unit, format_type, description) VALUES (?, ?, ?, ?, ?, ?)`);
+const insertMetric = db.prepare(`INSERT OR REPLACE INTO metrics (id, name, category_id, unit, format_type, description) VALUES (?, ?, ?, ?, ?, ?)`);
 insertMetric.run('gdp', 'GDP', 'economy', 'USD', 'currency', 'Gross Domestic Product');
 insertMetric.run('population', 'Population', 'population', 'people', 'number', 'Total population');
 insertMetric.run('gdp-growth', 'GDP Growth', 'economy', '%', 'percentage', 'Annual GDP growth rate');
 insertMetric.run('inflation', 'Inflation', 'economy', '%', 'percentage', 'Annual inflation rate');
 insertMetric.run('co2', 'CO₂ Emissions', 'environment', 'Mt', 'number', 'Carbon dioxide emissions');
+insertMetric.run('gdp-per-capita', 'GDP per capita', 'economy', 'USD', 'currency', 'GDP per capita (current US$)');
+insertMetric.run('population-growth', 'Population Growth', 'population', '%', 'percentage', 'Annual population growth rate');
+insertMetric.run('exports', 'Exports', 'economy', 'USD', 'currency', 'Exports of goods and services');
+insertMetric.run('imports', 'Imports', 'economy', 'USD', 'currency', 'Imports of goods and services');
+insertMetric.run('energy-consumption', 'Energy Consumption', 'environment', 'kg OE', 'number', 'Energy use (kg of oil equivalent per capita)');
 
-const insertSource = db.prepare(`INSERT INTO sources (id, name, url, license) VALUES (?, ?, ?, ?)`);
+const insertSource = db.prepare(`INSERT OR REPLACE INTO sources (id, name, url, license) VALUES (?, ?, ?, ?)`);
 insertSource.run('wb', 'World Bank', 'https://data.worldbank.org', 'CC BY 4.0');
 
-const insertHistoricalValue = db.prepare(`INSERT OR IGNORE INTO historical_values (country_id, metric_id, year, value) VALUES (?, ?, ?, ?)`);
+const insertHistoricalValue = db.prepare(`INSERT OR REPLACE INTO historical_values (country_id, metric_id, year, value) VALUES (?, ?, ?, ?)`);
 
 async function processCSV(filePath, metricId) {
   return new Promise((resolve, reject) => {
@@ -76,23 +85,30 @@ async function seed() {
 
   console.log('Loading World Bank Population data...');
   await processCSV(path.join(__dirname, '..', 'data', 'raw', 'population.csv'), 'population');
+
+  console.log('Loading World Bank GDP per capita data...');
+  await processCSV(path.join(__dirname, '..', 'data', 'raw', 'gdp-per-capita.csv'), 'gdp-per-capita');
+
+  console.log('Loading World Bank Population growth data...');
+  await processCSV(path.join(__dirname, '..', 'data', 'raw', 'population-growth.csv'), 'population-growth');
+
+  console.log('Loading World Bank Exports data...');
+  await processCSV(path.join(__dirname, '..', 'data', 'raw', 'exports.csv'), 'exports');
+
+  console.log('Loading World Bank Imports data...');
+  await processCSV(path.join(__dirname, '..', 'data', 'raw', 'imports.csv'), 'imports');
+
+  console.log('Loading World Bank Energy consumption data...');
+  await processCSV(path.join(__dirname, '..', 'data', 'raw', 'energy-consumption.csv'), 'energy-consumption');
   
-  // Static dummy values for remaining metrics for 2021-2023
-  const years = [2021, 2022, 2023];
-  const otherMetrics = ['gdp-growth', 'inflation', 'co2'];
-  
-  const allCountries = db.prepare('SELECT id FROM countries').all();
-  for (const c of allCountries) {
-    for (const m of otherMetrics) {
-      for (const y of years) {
-         let val = 0;
-         if (m === 'gdp-growth') val = (Math.random() * 5).toFixed(1);
-         if (m === 'inflation') val = (Math.random() * 6).toFixed(1);
-         if (m === 'co2') val = Math.floor(100 + Math.random() * 4000);
-         insertHistoricalValue.run(c.id, m, y, parseFloat(val));
-      }
-    }
-  }
+  console.log('Loading World Bank GDP growth data...');
+  await processCSV(path.join(__dirname, '..', 'data', 'raw', 'gdp-growth.csv'), 'gdp-growth');
+
+  console.log('Loading World Bank Inflation data...');
+  await processCSV(path.join(__dirname, '..', 'data', 'raw', 'inflation.csv'), 'inflation');
+
+  console.log('Loading World Bank CO2 Emissions data...');
+  await processCSV(path.join(__dirname, '..', 'data', 'raw', 'co2.csv'), 'co2');
 
   console.log('Database seeding complete. globiq.db is ready.');
 }
