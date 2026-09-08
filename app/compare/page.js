@@ -1,7 +1,8 @@
 import { Suspense } from "react";
 import CompareSelector from "@/components/globiq/compare-selector";
+import ComparisonChart from "@/components/globiq/comparison-chart";
 import { getCountries, getCountryWithLatestMetrics } from "@/lib/data/countries";
-import { getMetrics } from "@/lib/data/metrics";
+import { getMetrics, getHistoricalComparison } from "@/lib/data/metrics";
 import { formatMetricValue } from "@/lib/utils/format";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
@@ -19,6 +20,18 @@ export default async function ComparePage({ searchParams }) {
   const allCountries = await getCountries();
   const metrics = await getMetrics();
 
+  // Fetch historical data for all metrics
+  const historicalDataPromises = metrics.map(async (m) => {
+    const data = await getHistoricalComparison(m.id, limitedIds);
+    return { metricId: m.id, ...data };
+  });
+  
+  const historicalDataList = await Promise.all(historicalDataPromises);
+  const historicalDataMap = historicalDataList.reduce((acc, curr) => {
+    acc[curr.metricId] = curr;
+    return acc;
+  }, {});
+
   return (
     <div className="container px-4 py-8 md:py-12 mx-auto">
       <div className="mb-8">
@@ -28,53 +41,75 @@ export default async function ComparePage({ searchParams }) {
         </p>
       </div>
 
-      <div className="mb-12">
+      <div className="mb-12 relative z-10">
         <Suspense fallback={<div className="h-10 w-full animate-pulse bg-muted rounded"></div>}>
           <CompareSelector selectedIds={limitedIds} countries={allCountries} />
         </Suspense>
       </div>
 
       {selectedCountries.length > 0 ? (
-        <div className="rounded-md border overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-muted/50 border-b">
-              <tr>
-                <th className="p-4 font-medium text-muted-foreground w-1/4">Indicator</th>
-                {selectedCountries.map((country) => (
-                  <th key={country.id} className="p-4 font-semibold text-foreground w-1/4 min-w-37.5">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-2xl">{country.flag}</span>
-                      <Link href={`/country/${country.id}`} className="hover:underline inline-flex items-center gap-1">
-                        {country.name}
-                      </Link>
-                    </div>
-                  </th>
-                ))}
-                {Array.from({ length: Math.max(0, 4 - selectedCountries.length) }).map((_, i) => (
-                  <th key={`empty-header-${i}`} className="p-4 text-muted-foreground/50 font-normal w-1/4 min-w-37.5">
-                    Select a country
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {metrics.map((metric) => (
-                <tr key={metric.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="p-4 font-medium">{metric.name}</td>
+        <div className="space-y-12">
+          <div className="rounded-md border overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-muted/50 border-b">
+                <tr>
+                  <th className="p-4 font-medium text-muted-foreground w-1/4">Indicator (Latest)</th>
                   {selectedCountries.map((country) => (
-                    <td key={`${country.id}-${metric.id}`} className="p-4">
-                      {formatMetricValue(country[metric.id], metric)}
-                    </td>
+                    <th key={country.id} className="p-4 font-semibold text-foreground w-1/4 min-w-37.5">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-2xl">{country.flag}</span>
+                        <Link href={`/country/${country.id}`} className="hover:underline inline-flex items-center gap-1">
+                          {country.name}
+                        </Link>
+                      </div>
+                    </th>
                   ))}
                   {Array.from({ length: Math.max(0, 4 - selectedCountries.length) }).map((_, i) => (
-                    <td key={`empty-cell-${metric.id}-${i}`} className="p-4 text-muted-foreground/30">
-                      -
-                    </td>
+                    <th key={`empty-header-${i}`} className="p-4 text-muted-foreground/50 font-normal w-1/4 min-w-37.5">
+                      Select a country
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y">
+                {metrics.map((metric) => (
+                  <tr key={metric.id} className="hover:bg-muted/30 transition-colors">
+                    <td className="p-4 font-medium">{metric.name}</td>
+                    {selectedCountries.map((country) => (
+                      <td key={`${country.id}-${metric.id}`} className="p-4 font-medium">
+                        {formatMetricValue(country[metric.id], metric)}
+                      </td>
+                    ))}
+                    {Array.from({ length: Math.max(0, 4 - selectedCountries.length) }).map((_, i) => (
+                      <td key={`empty-cell-${metric.id}-${i}`} className="p-4 text-muted-foreground/30">
+                        -
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="space-y-8 pt-4">
+            <h2 className="text-2xl font-bold tracking-tight">Historical Trends</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {metrics.map(metric => {
+                const chartData = historicalDataMap[metric.id];
+                return (
+                  <div key={`chart-${metric.id}`} className="border rounded-lg p-6 bg-card shadow-sm min-w-0">
+                    <h3 className="text-lg font-semibold mb-1">{metric.name}</h3>
+                    <p className="text-sm text-muted-foreground mb-4">{metric.description} ({metric.unit})</p>
+                    <ComparisonChart 
+                      data={chartData?.data || []} 
+                      countries={chartData?.countries || []} 
+                      metric={metric} 
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-24 px-4 text-center border rounded-lg bg-muted/20 border-dashed">
