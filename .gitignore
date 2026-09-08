@@ -28,6 +28,7 @@
 *.db
 *.db-shm
 *.db-wal
+*.bak
 
 # Raw Data
 
