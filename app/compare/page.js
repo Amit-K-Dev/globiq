@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import CompareSelector from "@/components/globiq/compare-selector";
 import ComparisonChart from "@/components/globiq/comparison-chart";
 import { getCountries, getCountryWithLatestMetrics } from "@/lib/data/countries";
-import { getMetrics, getHistoricalComparison } from "@/lib/data/metrics";
+import { getMetrics, getHistoricalComparison, getRankingsByMetric } from "@/lib/data/metrics";
 import { formatMetricValue } from "@/lib/utils/format";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
@@ -32,6 +32,49 @@ export default async function ComparePage({ searchParams }) {
     return acc;
   }, {});
 
+  // Resolve dynamic latest year, value, and rank
+  const resolvedData = {};
+  await Promise.all(metrics.map(async (metric) => {
+    resolvedData[metric.id] = {};
+    const chartData = historicalDataMap[metric.id];
+    
+    const yearNeeds = new Set();
+    const countryLatest = {};
+    
+    selectedCountries.forEach((country) => {
+      let latestYear = null;
+      let latestValue = null;
+      if (chartData && chartData.data) {
+        for (let i = chartData.data.length - 1; i >= 0; i--) {
+          const point = chartData.data[i];
+          if (point[country.name] !== undefined && point[country.name] !== null) {
+            latestYear = point.year;
+            latestValue = point[country.name];
+            break;
+          }
+        }
+      }
+      countryLatest[country.id] = { year: latestYear, value: latestValue };
+      if (latestYear) yearNeeds.add(latestYear);
+    });
+    
+    const rankingsByYear = {};
+    for (const yr of yearNeeds) {
+      rankingsByYear[yr] = await getRankingsByMetric(metric.id, "all", "all", yr);
+    }
+    
+    selectedCountries.forEach((country) => {
+      const { year, value } = countryLatest[country.id];
+      let rank = null;
+      if (year && value !== null) {
+        const rankings = rankingsByYear[year];
+        const rankIndex = rankings.findIndex(r => r.country.id === country.id);
+        if (rankIndex >= 0) rank = rankIndex + 1;
+      }
+      resolvedData[metric.id][country.id] = { value, year, rank };
+    });
+  }));
+
   return (
     <div className="container px-4 py-8 md:py-12 mx-auto">
       <div className="mb-8">
@@ -55,12 +98,16 @@ export default async function ComparePage({ searchParams }) {
                 <tr>
                   <th className="p-4 font-medium text-muted-foreground w-1/4">Indicator (Latest)</th>
                   {selectedCountries.map((country) => (
-                    <th key={country.id} className="p-4 font-semibold text-foreground w-1/4 min-w-37.5">
+                    <th key={country.id} className="p-4 font-semibold text-foreground w-1/4 min-w-37.5 align-top">
                       <div className="flex flex-col gap-1">
                         <span className="text-2xl">{country.flag}</span>
                         <Link href={`/country/${country.id}`} className="hover:underline inline-flex items-center gap-1">
                           {country.name}
                         </Link>
+                        <div className="text-xs text-muted-foreground font-normal mt-1">
+                          {country.region}<br />
+                          {country.income_group || country.incomeGroup || 'Unknown'}
+                        </div>
                       </div>
                     </th>
                   ))}
@@ -74,12 +121,26 @@ export default async function ComparePage({ searchParams }) {
               <tbody className="divide-y">
                 {metrics.map((metric) => (
                   <tr key={metric.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="p-4 font-medium">{metric.name}</td>
-                    {selectedCountries.map((country) => (
-                      <td key={`${country.id}-${metric.id}`} className="p-4 font-medium">
-                        {formatMetricValue(country[metric.id], metric)}
-                      </td>
-                    ))}
+                    <td className="p-4 font-medium align-top">
+                      <div>{metric.name}</div>
+                      <div className="text-xs text-muted-foreground mt-1 font-normal">{metric.unit}</div>
+                    </td>
+                    {selectedCountries.map((country) => {
+                      const data = resolvedData[metric.id][country.id];
+                      return (
+                        <td key={`${country.id}-${metric.id}`} className="p-4 align-top">
+                          {data.value !== null ? (
+                            <div className="flex flex-col gap-1">
+                              <span className="font-semibold text-base">{formatMetricValue(data.value, metric)}</span>
+                              <span className="text-xs text-muted-foreground">Year: {data.year}</span>
+                              {data.rank && <span className="text-xs text-muted-foreground">Rank: #{data.rank}</span>}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground/50 text-sm">No data</span>
+                          )}
+                        </td>
+                      );
+                    })}
                     {Array.from({ length: Math.max(0, 4 - selectedCountries.length) }).map((_, i) => (
                       <td key={`empty-cell-${metric.id}-${i}`} className="p-4 text-muted-foreground/30">
                         -
