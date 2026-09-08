@@ -1,0 +1,123 @@
+import { getDb, globiqDb } from "../db/index.js";
+import { getCountriesWithLatestMetrics, getCountriesWithMetricsForYear } from "./countries.js";
+import { formatMetricValue } from "../utils/format.js";
+
+export async function getMetrics() {
+  return globiqDb.getMetrics();
+}
+
+export async function getMetricById(id) {
+  return globiqDb.getMetric(id) || null;
+}
+
+export async function searchMetrics(query) {
+  if (!query) return [];
+  const q = `%${query.toLowerCase()}%`;
+  const db = getDb();
+  return db.prepare("SELECT * FROM metrics WHERE name LIKE ? OR description LIKE ?").all(q, q);
+}
+
+export async function getRankingsByMetric(metricId, region = null, incomeGroup = null, year = 2023, limit = null) {
+  const metric = await getMetricById(metricId);
+  if (!metric) return [];
+  
+  const countries = await getCountriesWithMetricsForYear(year);
+  const sortKey = metricId === 'gdp-growth' ? 'gdpGrowth' : metricId;
+
+  let filtered = countries;
+  if (region && region !== "all") {
+    filtered = filtered.filter(c => {
+      if (!c.region) return false;
+      if (region === "Americas") return c.region.includes("America");
+      return c.region.includes(region);
+    });
+  }
+  if (incomeGroup && incomeGroup !== "all") {
+    filtered = filtered.filter(c => c.income_group === incomeGroup);
+  }
+
+  const sorted = filtered.sort((a, b) => {
+    return (b[sortKey] || 0) - (a[sortKey] || 0);
+  });
+  
+  const result = limit ? sorted.slice(0, limit) : sorted;
+
+  return result.map(country => ({
+    country,
+    formattedValue: formatMetricValue(country[sortKey], metric)
+  }));
+}
+
+
+
+export async function getHistoricalTrendByMetric(metricId, limit = 5) {
+  const db = globiqDb.db;
+  
+  // 1. Get top N countries for this metric in 2023
+  const topCountriesRows = db.prepare(`
+    SELECT c.id, c.name, v.value
+    FROM historical_values v
+    JOIN countries c ON v.country_id = c.id
+    WHERE v.metric_id = ? AND v.year = 2023
+    ORDER BY v.value DESC
+    LIMIT ?
+  `).all(metricId, limit);
+
+  if (!topCountriesRows.length) return { data: [], countries: [] };
+
+  const topCountryIds = topCountriesRows.map(r => r.id);
+  const placeholders = topCountryIds.map(() => '?').join(',');
+
+  // 2. Fetch all historical data for these countries and this metric
+  const historicalRows = db.prepare(`
+    SELECT c.name, v.year, v.value
+    FROM historical_values v
+    JOIN countries c ON v.country_id = c.id
+    WHERE v.metric_id = ? AND v.country_id IN (${placeholders})
+    ORDER BY v.year ASC
+  `).all(metricId, ...topCountryIds);
+
+  // 3. Pivot data for Recharts: [{ year: 2021, "United States": 100, "China": 80 }, { year: 2022, ... }]
+  const dataByYear = {};
+  for (const row of historicalRows) {
+    if (!dataByYear[row.year]) {
+      dataByYear[row.year] = { year: row.year.toString() };
+    }
+    dataByYear[row.year][row.name] = row.value;
+  }
+
+  return {
+    data: Object.values(dataByYear),
+    countries: topCountriesRows.map(r => r.name)
+  };
+}
+
+export async function getHistoricalComparison(metricId, countryIds) {
+  if (!countryIds || !countryIds.length) return { data: [], countries: [] };
+  const db = globiqDb.db;
+  
+  const placeholders = countryIds.map(() => '?').join(',');
+  const rows = db.prepare(`
+    SELECT c.name, v.year, v.value
+    FROM historical_values v
+    JOIN countries c ON v.country_id = c.id
+    WHERE v.metric_id = ? AND v.country_id IN (${placeholders})
+    ORDER BY v.year ASC
+  `).all(metricId, ...countryIds);
+
+  const dataByYear = {};
+  const countryNames = new Set();
+  
+  for (const row of rows) {
+    if (!dataByYear[row.year]) {
+      dataByYear[row.year] = { year: row.year.toString() };
+    }
+    dataByYear[row.year][row.name] = row.value;
+    countryNames.add(row.name);
+  }
+
+  return {
+    data: Object.values(dataByYear),
+    countries: Array.from(countryNames)
+  };
+}
