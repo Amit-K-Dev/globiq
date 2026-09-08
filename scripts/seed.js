@@ -166,6 +166,49 @@ async function seed() {
   console.log('Loading World Bank CO2 Emissions data...');
   await processCSV(path.join(__dirname, '..', 'data', 'raw', 'co2.csv'), 'co2');
 
+  console.log('Seeding Specialized Domains (Phase 7)...');
+  
+  // 1. QS Universities
+  console.log('Seeding QS Universities data...');
+  // Add to metrics table to satisfy legacy FK constraints
+  db.prepare(`INSERT OR REPLACE INTO metrics (id, name, category_id, unit, format_type, description) VALUES ('qs-rank', 'QS World University Rankings', 'economy', 'rank', 'number', 'QS World University Rankings')`).run();
+  
+  db.prepare(`INSERT OR REPLACE INTO metric_registry (canonical_id, entity_type, semantic_definition, unit, source_id, resolution_table, resolution_column) VALUES ('qs-rank', 'institution', 'QS World University Rankings', 'rank', 'wb', 'institution_metrics', 'rank')`).run();
+  
+  const insertInstitution = db.prepare(`INSERT OR REPLACE INTO institutions (id, name, country_id) VALUES (?, ?, ?)`);
+  insertInstitution.run('inst-mit', 'Massachusetts Institute of Technology (MIT)', 'usa');
+  insertInstitution.run('inst-stanford', 'Stanford University', 'usa');
+  insertInstitution.run('inst-oxford', 'University of Oxford', 'gbr');
+  insertInstitution.run('inst-cambridge', 'University of Cambridge', 'gbr');
+
+  const insertInstMetric = db.prepare(`INSERT OR REPLACE INTO institution_metrics (institution_id, metric_id, year, value, rank, source_id) VALUES (?, ?, ?, ?, ?, ?)`);
+  insertInstMetric.run('inst-mit', 'qs-rank', 2023, null, 1, 'wb');
+  insertInstMetric.run('inst-stanford', 'qs-rank', 2023, null, 3, 'wb');
+  insertInstMetric.run('inst-oxford', 'qs-rank', 2023, null, 4, 'wb');
+  insertInstMetric.run('inst-cambridge', 'qs-rank', 2023, null, 2, 'wb');
+  
+  insertInstMetric.run('inst-mit', 'qs-rank', 2022, null, 1, 'wb');
+  insertInstMetric.run('inst-stanford', 'qs-rank', 2022, null, 3, 'wb');
+  insertInstMetric.run('inst-oxford', 'qs-rank', 2022, null, 2, 'wb');
+  insertInstMetric.run('inst-cambridge', 'qs-rank', 2022, null, 3, 'wb');
+
+  // 2. Box Office
+  console.log('Seeding Box Office data...');
+  // Add to metrics table to satisfy legacy FK constraints
+  db.prepare(`INSERT OR REPLACE INTO metrics (id, name, category_id, unit, format_type, description) VALUES ('box-office', 'Global Box Office Gross', 'economy', 'USD', 'currency', 'Global Box Office Gross')`).run();
+
+  db.prepare(`INSERT OR REPLACE INTO metric_registry (canonical_id, entity_type, semantic_definition, unit, source_id, resolution_table, resolution_column) VALUES ('box-office', 'entertainment', 'Global Box Office Gross', 'USD', 'wb', 'entertainment_metrics', 'value')`).run();
+  
+  const insertMovie = db.prepare(`INSERT OR REPLACE INTO entertainment_entities (id, type, title, release_date, primary_country_id) VALUES (?, ?, ?, ?, ?)`);
+  insertMovie.run('mov-avatar', 'movie', 'Avatar', '2009-12-18', 'usa');
+  insertMovie.run('mov-avengers', 'movie', 'Avengers: Endgame', '2019-04-26', 'usa');
+  insertMovie.run('mov-dangal', 'movie', 'Dangal', '2016-12-21', 'ind');
+
+  const insertMovieMetric = db.prepare(`INSERT OR REPLACE INTO entertainment_metrics (entity_id, metric_id, market_country_id, period, value, source_id) VALUES (?, ?, ?, ?, ?, ?)`);
+  insertMovieMetric.run('mov-avatar', 'box-office', 'usa', '2023', 2923706026, 'wb');
+  insertMovieMetric.run('mov-avengers', 'box-office', 'usa', '2023', 2797501328, 'wb');
+  insertMovieMetric.run('mov-dangal', 'box-office', 'ind', '2023', 340000000, 'wb');
+
   console.log('Database seeding complete. globiq.db is ready.');
 }
 

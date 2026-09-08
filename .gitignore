@@ -34,6 +34,10 @@
 # Project Management
 globiq-phase-plan.md
 
+# test cases
+test.json
+
+
 # debug
 npm-debug.log*
 yarn-debug.log*
