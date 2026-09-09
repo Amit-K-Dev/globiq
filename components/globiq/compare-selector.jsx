@@ -19,7 +19,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-export default function CompareSelector({ selectedIds = [], countries = [], selectedMetrics = [], metrics = [] }) {
+export default function CompareSelector({ selectedIds = [], countries = [], selectedMetrics = [], metrics = [], availableYears = [], currentStartYear = null, currentEndYear = null }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [openCountry, setOpenCountry] = useState(false);
@@ -29,7 +29,7 @@ export default function CompareSelector({ selectedIds = [], countries = [], sele
   const availableCountries = countries.filter((c) => !selectedIds.includes(c.id));
   const availableMetrics = metrics.filter((m) => !selectedMetrics.includes(m.id));
 
-  const updateUrl = (newCountryIds, newMetricIds) => {
+  const updateUrl = (newCountryIds, newMetricIds, newStartYear = currentStartYear, newEndYear = currentEndYear) => {
     const params = new URLSearchParams(searchParams);
     
     if (newCountryIds.length > 0) {
@@ -42,6 +42,18 @@ export default function CompareSelector({ selectedIds = [], countries = [], sele
       params.set("metrics", newMetricIds.join(","));
     } else {
       params.delete("metrics");
+    }
+
+    if (newStartYear) {
+      params.set("startYear", newStartYear);
+    } else {
+      params.delete("startYear");
+    }
+
+    if (newEndYear) {
+      params.set("endYear", newEndYear);
+    } else {
+      params.delete("endYear");
     }
     
     router.push(`/compare?${params.toString()}`);
@@ -196,6 +208,41 @@ export default function CompareSelector({ selectedIds = [], countries = [], sele
               </Command>
             </PopoverContent>
           </Popover>
+        </div>
+      </div>
+
+      {/* Historical Timeframe Section */}
+      <div className="flex flex-col gap-3 pt-4 border-t border-muted/50">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium text-muted-foreground">Historical Timeframe</h3>
+        </div>
+        <div className="flex flex-wrap items-center gap-4 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">Start Year:</span>
+            <select 
+              className="bg-transparent border border-input rounded-md px-2 py-1 h-8 focus:outline-none focus:ring-1 focus:ring-ring"
+              value={currentStartYear || "any"}
+              onChange={(e) => updateUrl(selectedIds, selectedMetrics, e.target.value === "any" ? null : e.target.value, currentEndYear)}
+            >
+              <option value="any" className="bg-background text-foreground">None (Baseline only)</option>
+              {availableYears.map(year => (
+                <option key={`start-${year}`} value={year} className="bg-background text-foreground">{year}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">End Year:</span>
+            <select 
+              className="bg-transparent border border-input rounded-md px-2 py-1 h-8 focus:outline-none focus:ring-1 focus:ring-ring"
+              value={currentEndYear || "any"}
+              onChange={(e) => updateUrl(selectedIds, selectedMetrics, currentStartYear, e.target.value === "any" ? null : e.target.value)}
+            >
+              <option value="any" className="bg-background text-foreground">Latest Available</option>
+              {availableYears.map(year => (
+                <option key={`end-${year}`} value={year} className="bg-background text-foreground">{year}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
     </div>

@@ -11,6 +11,18 @@ export default async function ComparePage({ searchParams }) {
   const params = await searchParams;
   const countryIds = params.countries ? params.countries.split(",").filter(Boolean) : [];
   
+  const startYearParam = parseInt(params.startYear, 10);
+  const endYearParam = parseInt(params.endYear, 10);
+  
+  let startYear = !isNaN(startYearParam) ? startYearParam : null;
+  let endYear = !isNaN(endYearParam) ? endYearParam : null;
+
+  if (startYear !== null && endYear !== null && startYear > endYear) {
+    const temp = startYear;
+    startYear = endYear;
+    endYear = temp;
+  }
+  
   // Enforce max 4
   const limitedIds = countryIds.slice(0, 4);
   const selectedCountries = await Promise.all(
@@ -39,6 +51,16 @@ export default async function ComparePage({ searchParams }) {
     return acc;
   }, {});
 
+  const allAvailableYears = new Set();
+  Object.values(historicalDataMap).forEach(chart => {
+    if (chart && chart.data) {
+      chart.data.forEach(p => {
+        if (p.year) allAvailableYears.add(Number(p.year));
+      });
+    }
+  });
+  const sortedYears = Array.from(allAvailableYears).sort((a, b) => b - a);
+
   // Resolve dynamic latest year, value, and rank
   const resolvedData = {};
   await Promise.all(metrics.map(async (metric) => {
@@ -51,17 +73,42 @@ export default async function ComparePage({ searchParams }) {
     selectedCountries.forEach((country) => {
       let latestYear = null;
       let latestValue = null;
+      let startValue = null;
+      let foundEnd = false;
+      
       if (chartData && chartData.data) {
         for (let i = chartData.data.length - 1; i >= 0; i--) {
           const point = chartData.data[i];
-          if (point[country.name] !== undefined && point[country.name] !== null) {
-            latestYear = point.year;
-            latestValue = point[country.name];
-            break;
+          const val = point[country.name];
+          if (val !== undefined && val !== null) {
+            if (endYear !== null) {
+              if (Number(point.year) === endYear) {
+                latestYear = point.year;
+                latestValue = val;
+                foundEnd = true;
+              }
+            } else {
+              if (latestYear === null) {
+                latestYear = point.year;
+                latestValue = val;
+                foundEnd = true;
+              }
+            }
+            if (startYear !== null) {
+              if (Number(point.year) === startYear) {
+                startValue = val;
+              }
+            }
           }
         }
       }
-      countryLatest[country.id] = { year: latestYear, value: latestValue };
+      
+      if (endYear !== null && !foundEnd) {
+        latestYear = endYear.toString();
+        latestValue = null;
+      }
+
+      countryLatest[country.id] = { year: latestYear, value: latestValue, startValue };
       if (latestYear) yearNeeds.add(latestYear);
     });
     
@@ -97,7 +144,20 @@ export default async function ComparePage({ searchParams }) {
         }
       }
       
-      resolvedData[metric.id][country.id] = { value, year, rank, absoluteDelta, percentageDelta };
+      let histAbsoluteDelta = undefined;
+      let histPercentageDelta = undefined;
+      const startValue = countryLatest[country.id]?.startValue;
+      
+      if (startYear !== null && typeof value === 'number' && typeof startValue === 'number') {
+        histAbsoluteDelta = value - startValue;
+        if (startValue === 0) {
+          histPercentageDelta = null;
+        } else {
+          histPercentageDelta = ((value - startValue) / startValue) * 100;
+        }
+      }
+      
+      resolvedData[metric.id][country.id] = { value, year, rank, absoluteDelta, percentageDelta, histAbsoluteDelta, histPercentageDelta, startValue };
     });
   }));
 
@@ -115,8 +175,11 @@ export default async function ComparePage({ searchParams }) {
           <CompareSelector 
             selectedIds={limitedIds} 
             countries={allCountries} 
-            selectedMetrics={metricIds}
+            selectedMetrics={metricIds} 
             metrics={allMetrics}
+            availableYears={sortedYears}
+            currentStartYear={startYear}
+            currentEndYear={endYear}
           />
         </Suspense>
       </div>
@@ -127,7 +190,7 @@ export default async function ComparePage({ searchParams }) {
             <table className="w-full text-sm text-left">
               <thead className="bg-muted/50 border-b">
                 <tr>
-                  <th className="p-4 font-medium text-muted-foreground w-1/4">Indicator (Latest)</th>
+                  <th className="p-4 font-medium text-muted-foreground w-1/4">Indicator {endYear ? `(${endYear})` : '(Latest)'}</th>
                   {selectedCountries.map((country) => (
                     <th key={country.id} className="p-4 font-semibold text-foreground w-1/4 min-w-37.5 align-top">
                       <div className="flex flex-col gap-1">
@@ -170,6 +233,16 @@ export default async function ComparePage({ searchParams }) {
                         pctColorClass = metric.is_higher_better ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400";
                       }
 
+                      let histDeltaColorClass = "text-muted-foreground font-medium";
+                      let histPctColorClass = "text-muted-foreground";
+                      if (data.histAbsoluteDelta > 0) {
+                        histDeltaColorClass = metric.is_higher_better ? "text-green-600 dark:text-green-400 font-medium" : "text-red-600 dark:text-red-400 font-medium";
+                        histPctColorClass = metric.is_higher_better ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400";
+                      } else if (data.histAbsoluteDelta < 0) {
+                        histDeltaColorClass = metric.is_higher_better ? "text-red-600 dark:text-red-400 font-medium" : "text-green-600 dark:text-green-400 font-medium";
+                        histPctColorClass = metric.is_higher_better ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400";
+                      }
+
                       return (
                         <td key={`${country.id}-${metric.id}`} className="p-4 align-top">
                           {data.value !== null ? (
@@ -197,8 +270,34 @@ export default async function ComparePage({ searchParams }) {
                                   )}
                                 </div>
                               )}
-
-                              <span className="text-xs text-muted-foreground mt-1">Year: {data.year}</span>
+                              {startYear !== null && (
+                                <div className="text-xs mt-2 border-t pt-2 border-muted/50">
+                                  <div className="text-muted-foreground mb-0.5">vs {startYear}:</div>
+                                  {data.startValue !== null && data.value !== null ? (
+                                    <div>
+                                      <span className={histDeltaColorClass}>
+                                        {data.histAbsoluteDelta > 0 ? "+" : ""}
+                                        {formatMetricValue(data.histAbsoluteDelta, metric, true)}
+                                        {isRate && " pp"}
+                                      </span>
+                                      {data.histPercentageDelta !== null ? (
+                                        !isRate && (
+                                          <span className={`ml-1 ${histPctColorClass}`}>
+                                            ({data.histPercentageDelta > 0 ? "+" : ""}
+                                            {data.histPercentageDelta.toLocaleString(undefined, { maximumFractionDigits: 2 })}%)
+                                          </span>
+                                        )
+                                      ) : (!isRate && (
+                                        <span className="ml-1 text-muted-foreground">(N/A)</span>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span className="text-muted-foreground">(N/A)</span>
+                                  )}
+                                </div>
+                              )}
+                              
+                              <span className="text-xs text-muted-foreground mt-2 inline-block">Year: {data.year}</span>
                               {data.rank && <span className="text-xs text-muted-foreground">Rank: #{data.rank}</span>}
                             </div>
                           ) : (
@@ -223,12 +322,23 @@ export default async function ComparePage({ searchParams }) {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {metrics.map(metric => {
                 const chartData = historicalDataMap[metric.id];
+                let chartPoints = chartData?.data || [];
+                
+                if (startYear !== null || endYear !== null) {
+                  chartPoints = chartPoints.filter(p => {
+                    const yr = Number(p.year);
+                    if (startYear !== null && yr < startYear) return false;
+                    if (endYear !== null && yr > endYear) return false;
+                    return true;
+                  });
+                }
+                
                 return (
                   <div key={`chart-${metric.id}`} className="border rounded-lg p-6 bg-card shadow-sm min-w-0">
                     <h3 className="text-lg font-semibold mb-1">{metric.name}</h3>
                     <p className="text-sm text-muted-foreground mb-4">{metric.description} ({metric.unit})</p>
                     <ComparisonChart 
-                      data={chartData?.data || []} 
+                      data={chartPoints} 
                       countries={chartData?.countries || []} 
                       metric={metric} 
                     />
