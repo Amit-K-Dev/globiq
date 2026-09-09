@@ -18,7 +18,14 @@ export default async function ComparePage({ searchParams }) {
   ).then(res => res.filter(Boolean));
 
   const allCountries = await getCountries();
-  const metrics = await getMetrics();
+  const allMetrics = await getMetrics();
+  let metrics = allMetrics;
+
+  // Filter metrics if specified in URL
+  const metricIds = params.metrics ? params.metrics.split(",").filter(Boolean) : [];
+  if (metricIds.length > 0) {
+    metrics = metrics.filter(m => metricIds.includes(m.id));
+  }
 
   // Fetch historical data for all metrics
   const historicalDataPromises = metrics.map(async (m) => {
@@ -71,7 +78,26 @@ export default async function ComparePage({ searchParams }) {
         const rankIndex = rankings.findIndex(r => r.country.id === country.id);
         if (rankIndex >= 0) rank = rankIndex + 1;
       }
-      resolvedData[metric.id][country.id] = { value, year, rank };
+      
+      let absoluteDelta = undefined;
+      let percentageDelta = undefined;
+      
+      if (selectedCountries.length > 1) {
+        const baselineId = selectedCountries[0].id;
+        if (country.id !== baselineId) {
+          const baselineValue = countryLatest[baselineId]?.value;
+          if (typeof value === 'number' && typeof baselineValue === 'number') {
+            absoluteDelta = value - baselineValue;
+            if (baselineValue === 0) {
+              percentageDelta = null; // Use null to indicate N/A
+            } else {
+              percentageDelta = ((value - baselineValue) / baselineValue) * 100;
+            }
+          }
+        }
+      }
+      
+      resolvedData[metric.id][country.id] = { value, year, rank, absoluteDelta, percentageDelta };
     });
   }));
 
@@ -86,7 +112,12 @@ export default async function ComparePage({ searchParams }) {
 
       <div className="mb-12 relative z-10">
         <Suspense fallback={<div className="h-10 w-full animate-pulse bg-muted rounded"></div>}>
-          <CompareSelector selectedIds={limitedIds} countries={allCountries} />
+          <CompareSelector 
+            selectedIds={limitedIds} 
+            countries={allCountries} 
+            selectedMetrics={metricIds}
+            metrics={allMetrics}
+          />
         </Suspense>
       </div>
 
@@ -127,12 +158,47 @@ export default async function ComparePage({ searchParams }) {
                     </td>
                     {selectedCountries.map((country) => {
                       const data = resolvedData[metric.id][country.id];
+                      const isRate = metric.format_type === 'percentage' || metric.unit === '%';
+                      
+                      let deltaColorClass = "text-muted-foreground font-medium";
+                      let pctColorClass = "text-muted-foreground";
+                      if (data.absoluteDelta > 0) {
+                        deltaColorClass = metric.is_higher_better ? "text-green-600 dark:text-green-400 font-medium" : "text-red-600 dark:text-red-400 font-medium";
+                        pctColorClass = metric.is_higher_better ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400";
+                      } else if (data.absoluteDelta < 0) {
+                        deltaColorClass = metric.is_higher_better ? "text-red-600 dark:text-red-400 font-medium" : "text-green-600 dark:text-green-400 font-medium";
+                        pctColorClass = metric.is_higher_better ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400";
+                      }
+
                       return (
                         <td key={`${country.id}-${metric.id}`} className="p-4 align-top">
                           {data.value !== null ? (
                             <div className="flex flex-col gap-1">
                               <span className="font-semibold text-base">{formatMetricValue(data.value, metric)}</span>
-                              <span className="text-xs text-muted-foreground">Year: {data.year}</span>
+                              
+                              {country.id !== selectedCountries[0].id && selectedCountries.length > 1 && (
+                                <div className="text-xs mt-0.5">
+                                  {data.absoluteDelta !== undefined ? (
+                                    <>
+                                      <span className={deltaColorClass}>
+                                        {data.absoluteDelta > 0 ? "+" : ""}
+                                        {isRate ? `${data.absoluteDelta.toLocaleString(undefined, { maximumFractionDigits: 2 })} pp` : formatMetricValue(data.absoluteDelta, metric)}
+                                      </span>
+                                      {!isRate && data.percentageDelta !== null ? (
+                                        <span className={`ml-1 ${pctColorClass}`}>
+                                          ({data.percentageDelta > 0 ? "+" : ""}{data.percentageDelta.toFixed(1)}%)
+                                        </span>
+                                      ) : (!isRate && (
+                                        <span className="ml-1 text-muted-foreground">(N/A)</span>
+                                      ))}
+                                    </>
+                                  ) : (
+                                    <span className="text-muted-foreground">(N/A)</span>
+                                  )}
+                                </div>
+                              )}
+
+                              <span className="text-xs text-muted-foreground mt-1">Year: {data.year}</span>
                               {data.rank && <span className="text-xs text-muted-foreground">Rank: #{data.rank}</span>}
                             </div>
                           ) : (
